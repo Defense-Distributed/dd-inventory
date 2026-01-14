@@ -41,12 +41,6 @@ $ddi_update_checker->setBranch('main');
 // Enable release assets (downloads from GitHub releases)
 $ddi_update_checker->getVcsApi()->enableReleaseAssets();
 
-// For private repos: Use authentication token from wp-config.php
-// Add this line to wp-config.php: define('DDI_GITHUB_TOKEN', 'your_token_here');
-if (defined('DDI_GITHUB_TOKEN') && DDI_GITHUB_TOKEN) {
-    $ddi_update_checker->setAuthentication(DDI_GITHUB_TOKEN);
-}
-
 /**
  * Main plugin class
  */
