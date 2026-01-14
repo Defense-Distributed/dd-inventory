@@ -342,6 +342,7 @@ class DDI_Settings {
      */
     private function render_webhook_info() {
         $site_url = get_site_url();
+        $webhook_secret = get_option('ddi_webhook_secret', '');
         ?>
         <div class="ddi-info-section">
             <h2><?php esc_html_e('Webhook Configuration', 'dd-inventory'); ?></h2>
@@ -360,6 +361,18 @@ class DDI_Settings {
                     </td>
                 </tr>
                 <tr>
+                    <th scope="row"><?php esc_html_e('Webhook Secret', 'dd-inventory'); ?></th>
+                    <td>
+                        <code id="ddi-webhook-secret"><?php echo esc_html($webhook_secret); ?></code>
+                        <button type="button" class="button button-small ddi-copy-btn" data-target="ddi-webhook-secret">
+                            <?php esc_html_e('Copy', 'dd-inventory'); ?>
+                        </button>
+                        <p class="description">
+                            <?php esc_html_e('Copy this secret to your inventory tracker sales channel configuration to verify webhook signatures.', 'dd-inventory'); ?>
+                        </p>
+                    </td>
+                </tr>
+                <tr>
                     <th scope="row"><?php esc_html_e('REST API Credentials', 'dd-inventory'); ?></th>
                     <td>
                         <a href="<?php echo esc_url(admin_url('admin.php?page=wc-settings&tab=advanced&section=keys')); ?>" class="button">
@@ -374,7 +387,6 @@ class DDI_Settings {
         </div>
         <?php
     }
-
     /**
      * Render recent logs
      */
