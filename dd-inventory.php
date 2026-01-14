@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: DD Inventory
- * Plugin URI: https://github.com/your-org/dd-inventory
+ * Plugin URI: https://github.com/Defense-Distributed/dd-inventory
  * Description: Syncs WooCommerce inventory with an external inventory management system. The inventory tracker pushes products/inventory to WooCommerce, and WooCommerce sends order webhooks back.
  * Version: 1.0.0
- * Author: Your Organization
- * Author URI: https://your-org.com
+ * Author: Defense Distributed
+ * Author URI: https://defcad.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: dd-inventory
@@ -24,6 +24,28 @@ define('DDI_PLUGIN_FILE', __FILE__);
 define('DDI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DDI_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DDI_PLUGIN_BASENAME', plugin_basename(__FILE__));
+
+// Plugin Update Checker - for automatic updates from GitHub
+require_once DDI_PLUGIN_DIR . 'plugin-update-checker/plugin-update-checker.php';
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+$ddi_update_checker = PucFactory::buildUpdateChecker(
+    'https://github.com/Defense-Distributed/dd-inventory',
+    __FILE__,
+    'dd-inventory'
+);
+
+// Set the branch that contains the stable release
+$ddi_update_checker->setBranch('main');
+
+// Enable release assets (downloads from GitHub releases)
+$ddi_update_checker->getVcsApi()->enableReleaseAssets();
+
+// For private repos: Use authentication token from wp-config.php
+// Add this line to wp-config.php: define('DDI_GITHUB_TOKEN', 'your_token_here');
+if (defined('DDI_GITHUB_TOKEN') && DDI_GITHUB_TOKEN) {
+    $ddi_update_checker->setAuthentication(DDI_GITHUB_TOKEN);
+}
 
 /**
  * Main plugin class
