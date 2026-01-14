@@ -1,0 +1,245 @@
+/**
+ * DD Inventory - Admin Styles
+ */
+
+/* Settings Page Layout */
+.ddi-settings-wrap {
+    max-width: 1200px;
+}
+
+/* Status Cards */
+.ddi-status-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: 20px 0 30px;
+}
+
+.ddi-status-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.ddi-status-card h3 {
+    margin: 0 0 15px;
+    font-size: 14px;
+    color: #1d2327;
+}
+
+.ddi-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.ddi-status-indicator.configured {
+    color: #00a32a;
+}
+
+.ddi-status-indicator.not-configured {
+    color: #d63638;
+}
+
+.ddi-status-count {
+    font-size: 32px;
+    font-weight: 600;
+    color: #2271b1;
+    line-height: 1;
+}
+
+.ddi-status-card p {
+    margin: 5px 0 15px;
+    color: #646970;
+    font-size: 13px;
+}
+
+.ddi-status-card .button {
+    display: block;
+    text-align: center;
+}
+
+/* Info Sections */
+.ddi-info-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.ddi-info-section h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+/* Webhook Info Table */
+.ddi-webhook-info code {
+    background: #f0f0f1;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 13px;
+    word-break: break-all;
+}
+
+.ddi-webhook-info .ddi-copy-btn,
+.ddi-webhook-info .ddi-regenerate-secret {
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* Logs Table */
+.ddi-logs-table {
+    margin-top: 15px;
+}
+
+.ddi-logs-table th {
+    text-align: left;
+    padding: 10px;
+    background: #f0f0f1;
+}
+
+.ddi-logs-table td {
+    padding: 10px;
+    vertical-align: top;
+}
+
+.ddi-logs-table code {
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+/* Notices */
+.ddi-sku-notice,
+.ddi-stock-notice {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 10px !important;
+    margin: 10px 0 !important;
+}
+
+.ddi-sku-notice .dashicons,
+.ddi-stock-notice .dashicons {
+    margin-right: 5px;
+}
+
+/* Product List Column */
+.column-ddi_synced {
+    width: 40px;
+    text-align: center;
+}
+
+.column-ddi_synced .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+/* Meta Box Styles */
+.ddi-sync-status-box .ddi-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.ddi-sync-status-box .ddi-badge-synced {
+    background: #d4edda;
+    color: #155724;
+}
+
+.ddi-sync-status-box .ddi-badge-not-synced {
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
+.ddi-sync-status-box .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
+/* Loading States */
+.ddi-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.ddi-loading::after {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-left: 8px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #2271b1;
+    border-radius: 50%;
+    animation: ddi-spin 1s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes ddi-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Toast Notifications */
+.ddi-toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 12px 20px;
+    background: #1d2327;
+    color: #fff;
+    border-radius: 4px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    z-index: 100000;
+    animation: ddi-slideIn 0.3s ease-out;
+}
+
+.ddi-toast.success {
+    background: #00a32a;
+}
+
+.ddi-toast.error {
+    background: #d63638;
+}
+
+@keyframes ddi-slideIn {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .ddi-status-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .ddi-webhook-info code {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .ddi-webhook-info .button {
+        display: block;
+        margin: 5px 0;
+    }
+}
