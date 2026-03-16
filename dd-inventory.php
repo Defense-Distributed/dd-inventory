@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DD Inventory
  * Description: WooCommerce inventory sync connector.
- * Version: 1.1.0
+ * Version: 1.2.1
  * Author: Defense Distributed
  * Author URI: https://defdist.org
  * License: GPL v2 or later
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Define plugin constants
-define('DDI_VERSION', '1.1.0');
+define('DDI_VERSION', '1.2.1');
 define('DDI_PLUGIN_FILE', __FILE__);
 define('DDI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DDI_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -130,6 +130,7 @@ final class DD_Inventory {
      * Include required files
      */
     private function includes() {
+        require_once DDI_PLUGIN_DIR . 'includes/class-ddi-connection.php';
         require_once DDI_PLUGIN_DIR . 'includes/class-ddi-settings.php';
         require_once DDI_PLUGIN_DIR . 'includes/class-ddi-webhooks.php';
         require_once DDI_PLUGIN_DIR . 'includes/class-ddi-product-sync.php';
@@ -140,6 +141,7 @@ final class DD_Inventory {
      * Initialize classes
      */
     private function init_classes() {
+        DDI_Connection::instance();
         DDI_Settings::instance();
         DDI_Webhooks::instance();
         DDI_Product_Sync::instance();

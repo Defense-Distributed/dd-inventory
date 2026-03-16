@@ -63,6 +63,86 @@
     text-align: center;
 }
 
+/* Connection Card */
+.ddi-connection-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 24px;
+    margin: 20px 0;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.ddi-connection-status.connected {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ddi-connection-status.connected > .dashicons {
+    color: #00a32a;
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+}
+
+.ddi-connection-status.connected > div {
+    flex: 1;
+}
+
+.ddi-connection-status.connected strong {
+    display: block;
+    font-size: 15px;
+    color: #1d2327;
+}
+
+.ddi-connection-detail {
+    display: block;
+    font-size: 13px;
+    color: #646970;
+    margin-top: 2px;
+}
+
+.ddi-connection-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ddi-connection-setup h2 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.ddi-token-input-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    max-width: 600px;
+}
+
+.ddi-token-input-group .large-text {
+    flex: 1;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.ddi-connect-status {
+    margin-top: 12px;
+    font-size: 13px;
+}
+
+.ddi-connect-status .error {
+    color: #d63638;
+}
+
+.ddi-connect-status .success {
+    color: #00a32a;
+}
+
+.ddi-connect-status .connecting {
+    color: #2271b1;
+}
+
 /* Info Sections */
 .ddi-info-section {
     background: #fff;
