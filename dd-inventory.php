@@ -2,10 +2,10 @@
 /**
  * Plugin Name: DD Inventory
  * Plugin URI: https://github.com/Defense-Distributed/dd-inventory
- * Description: DD Inventory connector for WooCommerce.
- * Version: 1.0.3
+ * Description: WooCommerce inventory sync connector.
+ * Version: 1.1.0
  * Author: Defense Distributed
- * Author URI: https://defcad.com
+ * Author URI: https://defdist.org
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: dd-inventory
@@ -19,7 +19,7 @@
 defined('ABSPATH') || exit;
 
 // Define plugin constants
-define('DDI_VERSION', '1.0.3');
+define('DDI_VERSION', '1.1.0');
 define('DDI_PLUGIN_FILE', __FILE__);
 define('DDI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DDI_PLUGIN_URL', plugin_dir_url(__FILE__));

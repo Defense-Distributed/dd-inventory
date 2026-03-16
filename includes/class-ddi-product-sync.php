@@ -1,6 +1,6 @@
 <?php
 /**
- * Product sync class - handles SKU protection and stock locking
+ * Product sync class - handles SKU protection, stock locking, and price locking
  *
  * @package DD_Inventory
  */
@@ -46,13 +46,19 @@ class DDI_Product_Sync {
         // Lock stock management for synced products
         add_action('woocommerce_product_options_stock_fields', array($this, 'add_stock_lock_notice'));
         add_filter('woocommerce_product_get_manage_stock', array($this, 'force_manage_stock'), 10, 2);
-        add_action('admin_footer', array($this, 'add_stock_lock_script'));
+
+        // Server-side protection: revert unauthorized stock and price changes
+        add_action('woocommerce_before_product_object_save', array($this, 'enforce_synced_fields'), 10, 1);
+
+        // Admin UI: lock fields via JS and show banner
+        add_action('admin_footer', array($this, 'add_synced_product_script'));
+        add_action('admin_notices', array($this, 'add_synced_product_banner'));
 
         // Add custom meta box for sync status
         add_action('add_meta_boxes', array($this, 'add_sync_meta_box'));
 
         // Log stock changes for synced products
-        add_action('woocommerce_product_set_stock', array($this, 'maybe_prevent_stock_change'), 10, 1);
+        add_action('woocommerce_product_set_stock', array($this, 'log_stock_change'), 10, 1);
 
         // Add bulk action to mark products as synced/unsynced
         add_filter('bulk_actions-edit-product', array($this, 'add_bulk_actions'));
@@ -78,7 +84,7 @@ class DDI_Product_Sync {
         // Check for custom header or meta to mark as synced
         $headers = $request->get_headers();
 
-        // Check for our custom header
+        // Check for our custom header (WordPress normalizes headers to lowercase with underscores)
         if (isset($headers['x_dd_inventory_sync']) || isset($headers['X-DD-Inventory-Sync'])) {
             $this->set_synced_status($product->get_id(), true);
             DDI()->log_sync_event('product', 'marked_synced', sprintf(
@@ -194,7 +200,7 @@ class DDI_Product_Sync {
             <p class="form-field ddi-stock-notice" style="padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107;">
                 <span class="dashicons dashicons-info" style="color: #856404;"></span>
                 <strong><?php esc_html_e('Stock Managed by DD Inventory', 'dd-inventory'); ?></strong><br>
-                <em><?php esc_html_e('Stock quantity is controlled by your external inventory system. Changes made here may be overwritten.', 'dd-inventory'); ?></em>
+                <em><?php esc_html_e('Stock quantity is controlled by your external inventory system. Changes made here will be reverted.', 'dd-inventory'); ?></em>
             </p>
             <?php
         }
@@ -215,9 +221,110 @@ class DDI_Product_Sync {
     }
 
     /**
-     * Add script to disable stock fields for synced products
+     * Server-side enforcement: revert stock and price changes for synced products
+     * when changes come from admin (not REST API).
+     *
+     * @param WC_Product $product Product object about to be saved
      */
-    public function add_stock_lock_script() {
+    public function enforce_synced_fields($product) {
+        // Allow changes from REST API (that's how inventory sync works)
+        if (defined('REST_REQUEST') && REST_REQUEST) {
+            return;
+        }
+
+        $product_id = $product->get_id();
+        if (!$product_id || !$this->is_product_synced($product_id)) {
+            return;
+        }
+
+        $settings = get_option('ddi_settings', array());
+        $lock_stock = isset($settings['lock_stock_management']) && $settings['lock_stock_management'] === 'yes';
+
+        // Get the current saved values from the database
+        $saved_product = wc_get_product($product_id);
+        if (!$saved_product) {
+            return;
+        }
+
+        // Revert stock quantity if changed from admin
+        if ($lock_stock) {
+            $saved_stock = $saved_product->get_stock_quantity('edit');
+            $new_stock = $product->get_stock_quantity('edit');
+
+            if ($saved_stock !== $new_stock) {
+                $product->set_stock_quantity($saved_stock);
+                DDI()->log_sync_event('product', 'stock_reverted', sprintf(
+                    'Blocked admin stock change for "%s" (SKU: %s): %s → %s reverted',
+                    $product->get_name(),
+                    $product->get_sku(),
+                    $new_stock ?? 'null',
+                    $saved_stock ?? 'null'
+                ));
+            }
+        }
+
+        // Revert price changes if changed from admin
+        $saved_regular = $saved_product->get_regular_price('edit');
+        $saved_sale = $saved_product->get_sale_price('edit');
+        $new_regular = $product->get_regular_price('edit');
+        $new_sale = $product->get_sale_price('edit');
+
+        if ($saved_regular !== $new_regular) {
+            $product->set_regular_price($saved_regular);
+            DDI()->log_sync_event('product', 'price_reverted', sprintf(
+                'Blocked admin price change for "%s" (SKU: %s): %s → %s reverted',
+                $product->get_name(),
+                $product->get_sku(),
+                $new_regular,
+                $saved_regular
+            ));
+        }
+
+        if ($saved_sale !== $new_sale) {
+            $product->set_sale_price($saved_sale);
+        }
+    }
+
+    /**
+     * Show a prominent banner on synced product edit screens
+     */
+    public function add_synced_product_banner() {
+        $screen = get_current_screen();
+
+        if (!$screen || $screen->id !== 'product') {
+            return;
+        }
+
+        global $post;
+        if (!$post || !$this->is_product_synced($post->ID)) {
+            return;
+        }
+
+        $synced_at = get_post_meta($post->ID, '_ddi_synced_at', true);
+        $synced_text = $synced_at ? sprintf(
+            /* translators: %s: human-readable time difference */
+            __('Last synced %s ago', 'dd-inventory'),
+            human_time_diff(strtotime($synced_at), current_time('timestamp'))
+        ) : '';
+
+        ?>
+        <div class="notice notice-info ddi-sync-banner" style="border-left-color: #2271b1; padding: 12px 16px; display: flex; align-items: center; gap: 12px;">
+            <span class="dashicons dashicons-update" style="font-size: 24px; width: 24px; height: 24px; color: #2271b1;"></span>
+            <div>
+                <strong><?php esc_html_e('This product is managed by DD Inventory.', 'dd-inventory'); ?></strong>
+                <?php esc_html_e('SKU, stock, and price are controlled externally. Changes to these fields will be reverted.', 'dd-inventory'); ?>
+                <?php if ($synced_text) : ?>
+                    <br><small style="color: #666;"><?php echo esc_html($synced_text); ?></small>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Add script to disable stock and price fields for synced products
+     */
+    public function add_synced_product_script() {
         global $post, $pagenow;
 
         if ($pagenow !== 'post.php' || get_post_type() !== 'product') {
@@ -230,44 +337,51 @@ class DDI_Product_Sync {
 
         $settings = get_option('ddi_settings', array());
         $lock_stock = isset($settings['lock_stock_management']) && $settings['lock_stock_management'] === 'yes';
-
-        if (!$lock_stock) {
-            return;
-        }
+        $lock_icon = '<span class="dashicons dashicons-lock" style="color: #d63638; margin-left: 5px; font-size: 16px; width: 16px; height: 16px; vertical-align: middle;" title="' . esc_attr__('Managed by DD Inventory', 'dd-inventory') . '"></span>';
         ?>
         <script type="text/javascript">
         jQuery(function($) {
-            // Disable stock quantity field
+            var lockIcon = '<?php echo $lock_icon; ?>';
+
+            <?php if ($lock_stock) : ?>
+            // Lock stock quantity field
             $('#_stock').prop('readonly', true).css('background-color', '#f0f0f0');
-
-            // Add visual indicator
-            $('#_stock').closest('.form-field').append(
-                '<span class="dashicons dashicons-lock" style="color: #d63638; margin-left: 5px;" title="<?php esc_attr_e('Managed by DD Inventory', 'dd-inventory'); ?>"></span>'
-            );
-
-            // Disable manage stock checkbox
+            $('#_stock').closest('.form-field').find('label').append(lockIcon);
             $('#_manage_stock').prop('disabled', true);
+            <?php endif; ?>
 
-            // Warn on form submission if stock was changed
-            var originalStock = $('#_stock').val();
-            $('form#post').on('submit', function() {
-                if ($('#_stock').val() !== originalStock) {
-                    if (!confirm('<?php echo esc_js(__('Warning: This product\'s stock is managed by DD Inventory. Your changes may be overwritten. Continue?', 'dd-inventory')); ?>')) {
-                        return false;
+            // Lock price fields
+            $('#_regular_price, #_sale_price').prop('readonly', true).css('background-color', '#f0f0f0');
+            $('#_regular_price').closest('.form-field').find('label').append(lockIcon);
+            $('#_sale_price').closest('.form-field').find('label').append(lockIcon);
+
+            // Lock short description (synced from inventory)
+            var $shortDesc = $('#excerpt');
+            if ($shortDesc.length) {
+                $shortDesc.prop('readonly', true).css('background-color', '#f0f0f0');
+            }
+            // Also handle TinyMCE editor for short description
+            if (typeof tinymce !== 'undefined') {
+                tinymce.on('AddEditor', function(e) {
+                    if (e.editor.id === 'excerpt') {
+                        e.editor.on('init', function() {
+                            e.editor.getBody().setAttribute('contenteditable', false);
+                            e.editor.getBody().style.backgroundColor = '#f0f0f0';
+                        });
                     }
-                }
-            });
+                });
+            }
         });
         </script>
         <?php
     }
 
     /**
-     * Log stock changes for synced products
+     * Log stock changes for synced products (non-REST only)
      *
      * @param WC_Product $product Product object
      */
-    public function maybe_prevent_stock_change($product) {
+    public function log_stock_change($product) {
         // Don't log changes from REST API (that's how sync works)
         if (defined('REST_REQUEST') && REST_REQUEST) {
             return;
@@ -294,7 +408,7 @@ class DDI_Product_Sync {
             array($this, 'render_sync_meta_box'),
             'product',
             'side',
-            'default'
+            'high'
         );
     }
 
@@ -330,6 +444,13 @@ class DDI_Product_Sync {
                 </p>
             <?php endif; ?>
 
+            <?php if ($is_synced) : ?>
+                <p class="description" style="margin-top: 8px;">
+                    <span class="dashicons dashicons-lock" style="font-size: 14px; width: 14px; height: 14px;"></span>
+                    <?php esc_html_e('SKU, stock, and price fields are locked.', 'dd-inventory'); ?>
+                </p>
+            <?php endif; ?>
+
             <p>
                 <label>
                     <input type="checkbox"
@@ -338,9 +459,6 @@ class DDI_Product_Sync {
                            <?php checked($is_synced); ?> />
                     <?php esc_html_e('Mark as synced product', 'dd-inventory'); ?>
                 </label>
-            </p>
-            <p class="description">
-                <?php esc_html_e('Synced products have SKU and stock fields locked.', 'dd-inventory'); ?>
             </p>
         </div>
 
