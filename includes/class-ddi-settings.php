@@ -112,18 +112,28 @@ class DDI_Settings {
 
     public function sanitize_settings($input) {
         $sanitized = array();
-
-        // Preserve connection fields that aren't in the form
         $existing = get_option('ddi_settings', array());
+
+        // Preserve connection fields from input first (set by ajax_connect),
+        // then fall back to existing DB values (preserves across form saves)
         foreach (array('webhook_url', 'connected_at', 'store_name', 'api_key_id') as $key) {
-            if (isset($existing[$key])) {
+            if (isset($input[$key])) {
+                $sanitized[$key] = $input[$key];
+            } elseif (isset($existing[$key])) {
                 $sanitized[$key] = $existing[$key];
             }
         }
 
-        $sanitized['lock_stock_management'] = isset($input['lock_stock_management']) ? 'yes' : 'no';
-        $sanitized['lock_sku_editing'] = isset($input['lock_sku_editing']) ? 'yes' : 'no';
-        $sanitized['auto_register_webhooks'] = isset($input['auto_register_webhooks']) ? 'yes' : 'no';
+        // Checkbox fields — only treat as checkboxes when submitted from the form.
+        // When called from ajax_connect/disconnect, these keys hold string values like 'yes'/'no'.
+        $checkbox_keys = array('lock_stock_management', 'lock_sku_editing', 'auto_register_webhooks');
+        foreach ($checkbox_keys as $key) {
+            if (isset($input[$key]) && in_array($input[$key], array('yes', 'no'), true)) {
+                $sanitized[$key] = $input[$key];
+            } else {
+                $sanitized[$key] = isset($input[$key]) ? 'yes' : 'no';
+            }
+        }
 
         return $sanitized;
     }
