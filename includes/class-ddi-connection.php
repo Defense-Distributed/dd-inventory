@@ -45,7 +45,14 @@ class DDI_Connection {
     }
 
     /**
-     * AJAX: Connect using token
+     * Get the URL to WooCommerce REST API keys page
+     */
+    public function get_api_keys_url() {
+        return admin_url('admin.php?page=wc-settings&tab=advanced&section=keys&create-key=1');
+    }
+
+    /**
+     * AJAX: Connect using token + manually created API keys
      */
     public function ajax_connect() {
         check_ajax_referer('ddi_admin_nonce', 'nonce');
@@ -55,6 +62,8 @@ class DDI_Connection {
         }
 
         $token = isset($_POST['token']) ? sanitize_text_field(wp_unslash($_POST['token'])) : '';
+        $consumer_key = isset($_POST['consumer_key']) ? sanitize_text_field(wp_unslash($_POST['consumer_key'])) : '';
+        $consumer_secret = isset($_POST['consumer_secret']) ? sanitize_text_field(wp_unslash($_POST['consumer_secret'])) : '';
 
         if (empty($token)) {
             wp_send_json_error(array('message' => __('Please enter a connection token.', 'dd-inventory')));
@@ -62,6 +71,18 @@ class DDI_Connection {
 
         if (strpos($token, 'ddi_') !== 0) {
             wp_send_json_error(array('message' => __('Invalid token format. Token should start with "ddi_".', 'dd-inventory')));
+        }
+
+        if (empty($consumer_key) || empty($consumer_secret)) {
+            wp_send_json_error(array('message' => __('Please enter your API Consumer Key and Consumer Secret.', 'dd-inventory')));
+        }
+
+        if (strpos($consumer_key, 'ck_') !== 0) {
+            wp_send_json_error(array('message' => __('Consumer Key should start with "ck_".', 'dd-inventory')));
+        }
+
+        if (strpos($consumer_secret, 'cs_') !== 0) {
+            wp_send_json_error(array('message' => __('Consumer Secret should start with "cs_".', 'dd-inventory')));
         }
 
         // Parse the token to extract the app URL
@@ -72,12 +93,6 @@ class DDI_Connection {
 
         $app_url = $parsed['url'];
 
-        // Create WooCommerce API keys for the inventory system
-        $api_keys = $this->create_api_keys();
-        if (is_wp_error($api_keys)) {
-            wp_send_json_error(array('message' => $api_keys->get_error_message()));
-        }
-
         // Send the token + API keys to the inventory app's connect endpoint
         $connect_url = rtrim($app_url, '/') . '/api/sync/connect';
         $site_url = get_site_url();
@@ -87,16 +102,14 @@ class DDI_Connection {
             'headers' => array('Content-Type' => 'application/json'),
             'body' => wp_json_encode(array(
                 'token' => $token,
-                'consumer_key' => $api_keys['consumer_key'],
-                'consumer_secret' => $api_keys['consumer_secret'],
+                'consumer_key' => $consumer_key,
+                'consumer_secret' => $consumer_secret,
                 'site_url' => $site_url,
             )),
             'sslverify' => true,
         ));
 
         if (is_wp_error($response)) {
-            // Clean up the API key we just created
-            $this->delete_api_key($api_keys['key_id']);
             wp_send_json_error(array(
                 'message' => __('Could not reach the inventory app: ', 'dd-inventory') . $response->get_error_message(),
             ));
@@ -106,8 +119,6 @@ class DDI_Connection {
         $response_body = json_decode(wp_remote_retrieve_body($response), true);
 
         if ($response_code !== 200 || empty($response_body['success'])) {
-            // Clean up the API key we just created
-            $this->delete_api_key($api_keys['key_id']);
             $error_message = isset($response_body['error']) ? $response_body['error'] : __('Connection failed.', 'dd-inventory');
             wp_send_json_error(array('message' => $error_message));
         }
@@ -121,7 +132,6 @@ class DDI_Connection {
         $settings['webhook_url'] = $webhook_url;
         $settings['connected_at'] = current_time('mysql');
         $settings['store_name'] = $store_name;
-        $settings['api_key_id'] = $api_keys['key_id'];
         update_option('ddi_settings', $settings);
 
         // Save webhook secret
@@ -152,16 +162,10 @@ class DDI_Connection {
 
         $settings = get_option('ddi_settings', array());
 
-        // Delete the API key we created
-        if (!empty($settings['api_key_id'])) {
-            $this->delete_api_key($settings['api_key_id']);
-        }
-
         // Clear connection details
         $settings['webhook_url'] = '';
         $settings['connected_at'] = '';
         $settings['store_name'] = '';
-        $settings['api_key_id'] = '';
         update_option('ddi_settings', $settings);
 
         DDI()->log_sync_event('connection', 'disconnected', 'Disconnected from inventory system');
@@ -196,78 +200,6 @@ class DDI_Connection {
         return array(
             'url' => $payload['u'],
             'channel_id' => isset($payload['c']) ? $payload['c'] : '',
-        );
-    }
-
-    /**
-     * Create WooCommerce REST API keys programmatically
-     */
-    private function create_api_keys() {
-        global $wpdb;
-
-        $user = wp_get_current_user();
-        if (!$user || !$user->ID) {
-            return new WP_Error('no_user', __('No user found to create API keys.', 'dd-inventory'));
-        }
-
-        // Check that the WooCommerce API keys table exists
-        $table = $wpdb->prefix . 'woocommerce_api_keys';
-        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table));
-        if (!$table_exists) {
-            return new WP_Error('no_table', __('WooCommerce API keys table not found. Is WooCommerce active?', 'dd-inventory'));
-        }
-
-        $description = 'Inventory Sync - ' . current_time('Y-m-d H:i');
-        $permissions = 'read_write';
-
-        $consumer_key = 'ck_' . wc_rand_hash();
-        $consumer_secret = 'cs_' . wc_rand_hash();
-
-        $data = array(
-            'user_id'         => $user->ID,
-            'description'     => $description,
-            'permissions'     => $permissions,
-            'consumer_key'    => wc_api_hash($consumer_key),
-            'consumer_secret' => $consumer_secret,
-            'truncated_key'   => substr($consumer_key, -7),
-        );
-
-        $result = $wpdb->insert($table, $data, array('%d', '%s', '%s', '%s', '%s', '%s'));
-
-        if (!$result) {
-            $db_error = $wpdb->last_error;
-            DDI()->log_sync_event('connection', 'api_key_error', 'DB insert failed: ' . $db_error);
-            return new WP_Error('db_error', __('Failed to create API keys: ', 'dd-inventory') . $db_error);
-        }
-
-        $key_id = $wpdb->insert_id;
-
-        // Verify the key was actually created
-        $verify = $wpdb->get_var($wpdb->prepare(
-            "SELECT key_id FROM {$table} WHERE key_id = %d",
-            $key_id
-        ));
-        if (!$verify) {
-            DDI()->log_sync_event('connection', 'api_key_error', 'Key insert succeeded but key not found in table');
-            return new WP_Error('db_error', __('API key was created but could not be verified.', 'dd-inventory'));
-        }
-
-        return array(
-            'key_id' => $key_id,
-            'consumer_key' => $consumer_key,
-            'consumer_secret' => $consumer_secret,
-        );
-    }
-
-    /**
-     * Delete a WooCommerce API key by ID
-     */
-    private function delete_api_key($key_id) {
-        global $wpdb;
-        $wpdb->delete(
-            $wpdb->prefix . 'woocommerce_api_keys',
-            array('key_id' => absint($key_id)),
-            array('%d')
         );
     }
 }

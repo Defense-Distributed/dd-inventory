@@ -105,7 +105,7 @@ class DDI_Settings {
                 'error' => __('Error: ', 'dd-inventory'),
                 'registering' => __('Registering webhooks...', 'dd-inventory'),
                 'registered' => __('Webhooks registered!', 'dd-inventory'),
-                'confirm_disconnect' => __('Disconnect from inventory system? The WooCommerce API key created for this connection will be deleted.', 'dd-inventory'),
+                'confirm_disconnect' => __('Disconnect from inventory system?', 'dd-inventory'),
             ),
         ));
     }
@@ -116,7 +116,7 @@ class DDI_Settings {
 
         // Preserve connection fields from input first (set by ajax_connect),
         // then fall back to existing DB values (preserves across form saves)
-        foreach (array('webhook_url', 'connected_at', 'store_name', 'api_key_id') as $key) {
+        foreach (array('webhook_url', 'connected_at', 'store_name') as $key) {
             if (isset($input[$key])) {
                 $sanitized[$key] = $input[$key];
             } elseif (isset($existing[$key])) {
@@ -204,18 +204,36 @@ class DDI_Settings {
                 <div class="ddi-connection-setup">
                     <h2><?php esc_html_e('Connect to Inventory System', 'dd-inventory'); ?></h2>
                     <p class="description">
-                        <?php esc_html_e('Paste the connection token from your inventory app to connect this store.', 'dd-inventory'); ?>
+                        <?php esc_html_e('1. Create a WooCommerce REST API key, then paste it below with your connection token.', 'dd-inventory'); ?>
                     </p>
-                    <div class="ddi-token-input-group">
-                        <input type="text"
-                               id="ddi-connection-token"
-                               class="large-text"
-                               placeholder="ddi_..."
-                               autocomplete="off" />
+                    <p>
+                        <a href="<?php echo esc_url(DDI_Connection::instance()->get_api_keys_url()); ?>"
+                           class="button" target="_blank">
+                            <?php esc_html_e('Create API Key', 'dd-inventory'); ?> &rarr;
+                        </a>
+                        <span class="description" style="margin-left: 8px;">
+                            <?php esc_html_e('Set permissions to Read/Write, then copy the keys below.', 'dd-inventory'); ?>
+                        </span>
+                    </p>
+                    <table class="form-table" style="margin-top: 12px;">
+                        <tr>
+                            <th scope="row"><label for="ddi-consumer-key"><?php esc_html_e('Consumer Key', 'dd-inventory'); ?></label></th>
+                            <td><input type="text" id="ddi-consumer-key" class="regular-text" placeholder="ck_..." autocomplete="off" /></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="ddi-consumer-secret"><?php esc_html_e('Consumer Secret', 'dd-inventory'); ?></label></th>
+                            <td><input type="text" id="ddi-consumer-secret" class="regular-text" placeholder="cs_..." autocomplete="off" /></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="ddi-connection-token"><?php esc_html_e('Connection Token', 'dd-inventory'); ?></label></th>
+                            <td><input type="text" id="ddi-connection-token" class="large-text" placeholder="ddi_..." autocomplete="off" /></td>
+                        </tr>
+                    </table>
+                    <p>
                         <button type="button" class="button button-primary" id="ddi-connect-btn">
                             <?php esc_html_e('Connect', 'dd-inventory'); ?>
                         </button>
-                    </div>
+                    </p>
                     <div id="ddi-connect-status" class="ddi-connect-status" style="display:none;"></div>
                 </div>
             <?php endif; ?>

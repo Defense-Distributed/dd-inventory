@@ -15,8 +15,8 @@
             // Connect with token
             $(document).on('click', '#ddi-connect-btn', this.connect);
 
-            // Allow Enter key in token input
-            $(document).on('keydown', '#ddi-connection-token', function(e) {
+            // Allow Enter key in connection inputs
+            $(document).on('keydown', '#ddi-connection-token, #ddi-consumer-key, #ddi-consumer-secret', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     DDI_Admin.connect.call($('#ddi-connect-btn')[0], e);
@@ -44,8 +44,17 @@
 
             var $btn = $(this);
             var $tokenInput = $('#ddi-connection-token');
+            var $ckInput = $('#ddi-consumer-key');
+            var $csInput = $('#ddi-consumer-secret');
             var $status = $('#ddi-connect-status');
             var token = $tokenInput.val().trim();
+            var ck = $ckInput.val().trim();
+            var cs = $csInput.val().trim();
+
+            if (!ck || !cs) {
+                $status.html('<span class="error">Please enter your Consumer Key and Consumer Secret.</span>').show();
+                return;
+            }
 
             if (!token) {
                 $status.html('<span class="error">Please enter a connection token.</span>').show();
@@ -60,6 +69,8 @@
             var originalText = $btn.text();
             $btn.text(ddi_admin.strings.connecting).prop('disabled', true);
             $tokenInput.prop('disabled', true);
+            $ckInput.prop('disabled', true);
+            $csInput.prop('disabled', true);
             $status.html('<span class="connecting">Connecting to inventory system...</span>').show();
 
             $.ajax({
@@ -68,7 +79,9 @@
                 data: {
                     action: 'ddi_connect',
                     nonce: ddi_admin.nonce,
-                    token: token
+                    token: token,
+                    consumer_key: ck,
+                    consumer_secret: cs
                 },
                 success: function(response) {
                     if (response.success) {
@@ -80,12 +93,16 @@
                         $status.html('<span class="error">' + response.data.message + '</span>');
                         $btn.text(originalText).prop('disabled', false);
                         $tokenInput.prop('disabled', false);
+                        $ckInput.prop('disabled', false);
+                        $csInput.prop('disabled', false);
                     }
                 },
                 error: function(xhr, status, error) {
                     $status.html('<span class="error">Request failed: ' + error + '</span>');
                     $btn.text(originalText).prop('disabled', false);
                     $tokenInput.prop('disabled', false);
+                    $ckInput.prop('disabled', false);
+                    $csInput.prop('disabled', false);
                 }
             });
         },
