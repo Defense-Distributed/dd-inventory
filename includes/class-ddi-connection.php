@@ -210,6 +210,13 @@ class DDI_Connection {
             return new WP_Error('no_user', __('No user found to create API keys.', 'dd-inventory'));
         }
 
+        // Check that the WooCommerce API keys table exists
+        $table = $wpdb->prefix . 'woocommerce_api_keys';
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table));
+        if (!$table_exists) {
+            return new WP_Error('no_table', __('WooCommerce API keys table not found. Is WooCommerce active?', 'dd-inventory'));
+        }
+
         $description = 'Inventory Sync - ' . current_time('Y-m-d H:i');
         $permissions = 'read_write';
 
@@ -217,25 +224,33 @@ class DDI_Connection {
         $consumer_secret = 'cs_' . wc_rand_hash();
 
         $data = array(
-            'user_id' => $user->ID,
-            'description' => $description,
-            'permissions' => $permissions,
-            'consumer_key' => wc_api_hash($consumer_key),
+            'user_id'         => $user->ID,
+            'description'     => $description,
+            'permissions'     => $permissions,
+            'consumer_key'    => wc_api_hash($consumer_key),
             'consumer_secret' => $consumer_secret,
-            'truncated_key' => substr($consumer_key, -7),
+            'truncated_key'   => substr($consumer_key, -7),
         );
 
-        $result = $wpdb->insert(
-            $wpdb->prefix . 'woocommerce_api_keys',
-            $data,
-            array('%d', '%s', '%s', '%s', '%s', '%s')
-        );
+        $result = $wpdb->insert($table, $data, array('%d', '%s', '%s', '%s', '%s', '%s'));
 
         if (!$result) {
-            return new WP_Error('db_error', __('Failed to create API keys.', 'dd-inventory'));
+            $db_error = $wpdb->last_error;
+            DDI()->log_sync_event('connection', 'api_key_error', 'DB insert failed: ' . $db_error);
+            return new WP_Error('db_error', __('Failed to create API keys: ', 'dd-inventory') . $db_error);
         }
 
         $key_id = $wpdb->insert_id;
+
+        // Verify the key was actually created
+        $verify = $wpdb->get_var($wpdb->prepare(
+            "SELECT key_id FROM {$table} WHERE key_id = %d",
+            $key_id
+        ));
+        if (!$verify) {
+            DDI()->log_sync_event('connection', 'api_key_error', 'Key insert succeeded but key not found in table');
+            return new WP_Error('db_error', __('API key was created but could not be verified.', 'dd-inventory'));
+        }
 
         return array(
             'key_id' => $key_id,
