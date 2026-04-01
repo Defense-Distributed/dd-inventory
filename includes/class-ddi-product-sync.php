@@ -207,15 +207,21 @@ class DDI_Product_Sync {
     }
 
     /**
-     * Force manage_stock to true for synced products
+     * Force manage_stock to true for synced products (admin only).
+     * Skips during REST API requests so Residuum can set manage_stock to false
+     * for products that don't track inventory.
      *
      * @param bool $manage_stock Current value
      * @param WC_Product $product Product object
      * @return bool
      */
     public function force_manage_stock($manage_stock, $product) {
+        // Allow REST API to control manage_stock
+        if (defined('REST_REQUEST') && REST_REQUEST) {
+            return $manage_stock;
+        }
         if ($this->is_product_synced($product->get_id())) {
-            return true; // Always manage stock for synced products
+            return true; // Only force in admin UI
         }
         return $manage_stock;
     }
