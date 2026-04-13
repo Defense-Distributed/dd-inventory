@@ -85,7 +85,7 @@ class DDI_Product_Sync {
         $headers = $request->get_headers();
 
         // Check for our custom header (WordPress normalizes headers to lowercase with underscores)
-        if (isset($headers['x_dd_inventory_sync']) || isset($headers['X-DD-Inventory-Sync'])) {
+        if (isset($headers['x_inventory_sync']) || isset($headers['X-Inventory-Sync']) || isset($headers['x_dd_inventory_sync']) || isset($headers['X-DD-Inventory-Sync'])) {
             $this->set_synced_status($product->get_id(), true);
             DDI()->log_sync_event('product', 'marked_synced', sprintf(
                 'Product "%s" (ID: %d, SKU: %s) marked as synced via REST API',
