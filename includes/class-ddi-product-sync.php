@@ -129,6 +129,19 @@ class DDI_Product_Sync {
     }
 
     /**
+     * Whether the product is a bundle-style parent (Product Bundles, Composite
+     * Products, WPC Bundles, Mix and Match). These never manage their own
+     * stock — availability is computed from their children — so stock locking
+     * must not force manage_stock on them.
+     *
+     * @param WC_Product $product Product object
+     * @return bool
+     */
+    public function is_bundle_type($product) {
+        return $product->is_type(array('bundle', 'composite', 'woosb', 'mix-and-match'));
+    }
+
+    /**
      * Maybe lock SKU (prevents modification via filters)
      *
      * @param string $sku Product SKU
@@ -220,6 +233,17 @@ class DDI_Product_Sync {
         if (defined('REST_REQUEST') && REST_REQUEST) {
             return $manage_stock;
         }
+        // Admin display only — never rewrite the value on the storefront, where
+        // it changes purchasability logic.
+        if (!is_admin()) {
+            return $manage_stock;
+        }
+        // Bundle parents never manage their own stock; their availability is
+        // computed from the children. Forcing manage_stock here fights the
+        // bundle plugin and pins kits out of stock.
+        if ($this->is_bundle_type($product)) {
+            return $manage_stock;
+        }
         if ($this->is_product_synced($product->get_id())) {
             return true; // Only force in admin UI
         }
@@ -252,7 +276,10 @@ class DDI_Product_Sync {
             return;
         }
 
-        // Revert stock quantity if changed from admin
+        // Revert stock fields if changed from admin. Quantity alone is not
+        // enough: unchecking "manage stock", flipping the backorder policy, or
+        // hand-setting the stock status all detach the store from the synced
+        // quantity just as effectively as editing the number.
         if ($lock_stock) {
             $saved_stock = $saved_product->get_stock_quantity('edit');
             $new_stock = $product->get_stock_quantity('edit');
@@ -266,6 +293,54 @@ class DDI_Product_Sync {
                     $new_stock ?? 'null',
                     $saved_stock ?? 'null'
                 ));
+            }
+
+            $saved_manage = $saved_product->get_manage_stock('edit');
+            $new_manage = $product->get_manage_stock('edit');
+
+            if ($saved_manage !== $new_manage) {
+                $product->set_manage_stock($saved_manage);
+                DDI()->log_sync_event('product', 'manage_stock_reverted', sprintf(
+                    'Blocked admin manage-stock change for "%s" (SKU: %s): %s → %s reverted',
+                    $product->get_name(),
+                    $product->get_sku(),
+                    $new_manage ? 'on' : 'off',
+                    $saved_manage ? 'on' : 'off'
+                ));
+            }
+
+            $saved_backorders = $saved_product->get_backorders('edit');
+            $new_backorders = $product->get_backorders('edit');
+
+            if ($saved_backorders !== $new_backorders) {
+                $product->set_backorders($saved_backorders);
+                DDI()->log_sync_event('product', 'backorders_reverted', sprintf(
+                    'Blocked admin backorders change for "%s" (SKU: %s): %s → %s reverted',
+                    $product->get_name(),
+                    $product->get_sku(),
+                    $new_backorders,
+                    $saved_backorders
+                ));
+            }
+
+            // Stock status is only a free choice when stock isn't managed —
+            // when it is, WooCommerce derives status from quantity and
+            // backorders at save time, so reverting it there would fight the
+            // recompute.
+            if (!$saved_manage) {
+                $saved_status = $saved_product->get_stock_status('edit');
+                $new_status = $product->get_stock_status('edit');
+
+                if ($saved_status !== $new_status) {
+                    $product->set_stock_status($saved_status);
+                    DDI()->log_sync_event('product', 'stock_status_reverted', sprintf(
+                        'Blocked admin stock-status change for "%s" (SKU: %s): %s → %s reverted',
+                        $product->get_name(),
+                        $product->get_sku(),
+                        $new_status,
+                        $saved_status
+                    ));
+                }
             }
         }
 
