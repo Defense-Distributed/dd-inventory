@@ -71,6 +71,14 @@ class DDI_Settings {
             $this->page_slug,
             'ddi_sync_section'
         );
+
+        add_settings_field(
+            'github_token',
+            __('GitHub Access Token', 'dd-inventory'),
+            array($this, 'render_github_token_field'),
+            $this->page_slug,
+            'ddi_sync_section'
+        );
     }
 
     public function enqueue_scripts($hook) {
@@ -133,6 +141,14 @@ class DDI_Settings {
             } else {
                 $sanitized[$key] = isset($input[$key]) ? 'yes' : 'no';
             }
+        }
+
+        // GitHub token for authenticated update checks. Preserve the stored
+        // value when the field isn't part of the submission (ajax_connect etc).
+        if (isset($input['github_token'])) {
+            $sanitized['github_token'] = trim(sanitize_text_field($input['github_token']));
+        } elseif (isset($existing['github_token'])) {
+            $sanitized['github_token'] = $existing['github_token'];
         }
 
         return $sanitized;
@@ -295,6 +311,30 @@ class DDI_Settings {
                    <?php checked($checked); ?> />
             <?php esc_html_e('Automatically register webhooks on plugin activation', 'dd-inventory'); ?>
         </label>
+        <?php
+    }
+
+    public function render_github_token_field() {
+        // The DDI_GITHUB_TOKEN constant (wp-config.php) takes precedence over
+        // this field; when it's defined, show that and skip the input.
+        if (defined('DDI_GITHUB_TOKEN')) {
+            ?>
+            <em><?php esc_html_e('Configured via the DDI_GITHUB_TOKEN constant in wp-config.php.', 'dd-inventory'); ?></em>
+            <?php
+            return;
+        }
+
+        $settings = get_option('ddi_settings', array());
+        $token = isset($settings['github_token']) ? $settings['github_token'] : '';
+        ?>
+        <input type="password"
+               name="ddi_settings[github_token]"
+               value="<?php echo esc_attr($token); ?>"
+               class="regular-text"
+               autocomplete="off" />
+        <p class="description">
+            <?php esc_html_e('Authenticates plugin update checks against the GitHub API. Without it, update checks share a 60/hour per-IP limit that hosting providers often exhaust (403 errors). Use a fine-grained token with read-only access to public repositories.', 'dd-inventory'); ?>
+        </p>
         <?php
     }
 

@@ -43,9 +43,14 @@ class DDI_Product_Sync {
         add_action('woocommerce_product_options_sku', array($this, 'add_sku_lock_notice'));
         add_filter('woocommerce_admin_disabled_sku_field', array($this, 'disable_sku_field'));
 
-        // Lock stock management for synced products
+        // Lock stock management for synced products. Note: no
+        // woocommerce_product_get_manage_stock filter here — rewriting the
+        // value in reads made wp-admin display "manage stock" as on for
+        // products the inventory system deliberately set to unmanaged
+        // ("always available"), while the stored value stayed off. The real
+        // protection is enforce_synced_fields(), which reverts admin changes
+        // at save time.
         add_action('woocommerce_product_options_stock_fields', array($this, 'add_stock_lock_notice'));
-        add_filter('woocommerce_product_get_manage_stock', array($this, 'force_manage_stock'), 10, 2);
 
         // Server-side protection: revert unauthorized stock and price changes
         add_action('woocommerce_before_product_object_save', array($this, 'enforce_synced_fields'), 10, 1);
@@ -129,19 +134,6 @@ class DDI_Product_Sync {
     }
 
     /**
-     * Whether the product is a bundle-style parent (Product Bundles, Composite
-     * Products, WPC Bundles, Mix and Match). These never manage their own
-     * stock — availability is computed from their children — so stock locking
-     * must not force manage_stock on them.
-     *
-     * @param WC_Product $product Product object
-     * @return bool
-     */
-    public function is_bundle_type($product) {
-        return $product->is_type(array('bundle', 'composite', 'woosb', 'mix-and-match'));
-    }
-
-    /**
      * Maybe lock SKU (prevents modification via filters)
      *
      * @param string $sku Product SKU
@@ -217,37 +209,6 @@ class DDI_Product_Sync {
             </p>
             <?php
         }
-    }
-
-    /**
-     * Force manage_stock to true for synced products (admin only).
-     * Skips during REST API requests so Residuum can set manage_stock to false
-     * for products that don't track inventory.
-     *
-     * @param bool $manage_stock Current value
-     * @param WC_Product $product Product object
-     * @return bool
-     */
-    public function force_manage_stock($manage_stock, $product) {
-        // Allow REST API to control manage_stock
-        if (defined('REST_REQUEST') && REST_REQUEST) {
-            return $manage_stock;
-        }
-        // Admin display only — never rewrite the value on the storefront, where
-        // it changes purchasability logic.
-        if (!is_admin()) {
-            return $manage_stock;
-        }
-        // Bundle parents never manage their own stock; their availability is
-        // computed from the children. Forcing manage_stock here fights the
-        // bundle plugin and pins kits out of stock.
-        if ($this->is_bundle_type($product)) {
-            return $manage_stock;
-        }
-        if ($this->is_product_synced($product->get_id())) {
-            return true; // Only force in admin UI
-        }
-        return $manage_stock;
     }
 
     /**
@@ -428,7 +389,13 @@ class DDI_Product_Sync {
             // Lock stock quantity field
             $('#_stock').prop('readonly', true).css('background-color', '#f0f0f0');
             $('#_stock').closest('.form-field').find('label').append(lockIcon);
-            $('#_manage_stock').prop('disabled', true);
+            // Block interaction WITHOUT disabling: a disabled checkbox is
+            // omitted from the form POST, which made every admin save of a
+            // synced product silently turn manage_stock off.
+            $('#_manage_stock')
+                .on('click keydown', function(e) { e.preventDefault(); return false; })
+                .attr('aria-disabled', 'true')
+                .css({ opacity: '0.6', cursor: 'not-allowed' });
             <?php endif; ?>
 
             // Lock price fields

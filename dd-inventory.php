@@ -2,7 +2,7 @@
 /**
  * Plugin Name: DD Inventory
  * Description: WooCommerce inventory sync connector.
- * Version: 1.3.0
+ * Version: 1.3.1
  * Author: Defense Distributed
  * Author URI: https://defdist.org
  * License: GPL v2 or later
@@ -18,7 +18,7 @@
 defined('ABSPATH') || exit;
 
 // Define plugin constants
-define('DDI_VERSION', '1.3.0');
+define('DDI_VERSION', '1.3.1');
 define('DDI_PLUGIN_FILE', __FILE__);
 define('DDI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DDI_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -38,6 +38,22 @@ $ddi_update_checker->setBranch('main');
 
 // Enable release assets (downloads from GitHub releases)
 $ddi_update_checker->getVcsApi()->enableReleaseAssets();
+
+// Authenticate GitHub API requests when a token is configured. Unauthenticated
+// requests share a 60/hour per-IP rate limit that hosting providers routinely
+// exhaust, which surfaces as "403 puc-github-http-error" on every update check
+// even though the repository is public. A token raises the limit to 5000/hour,
+// attributed to the token instead of the shared IP.
+// Configure via the DDI_GITHUB_TOKEN constant in wp-config.php, or the
+// "GitHub Access Token" field in the plugin settings.
+$ddi_settings_for_updates = get_option('ddi_settings', array());
+$ddi_github_token = defined('DDI_GITHUB_TOKEN')
+    ? DDI_GITHUB_TOKEN
+    : (isset($ddi_settings_for_updates['github_token']) ? $ddi_settings_for_updates['github_token'] : '');
+if (!empty($ddi_github_token)) {
+    $ddi_update_checker->setAuthentication($ddi_github_token);
+}
+unset($ddi_settings_for_updates, $ddi_github_token);
 
 /**
  * Main plugin class

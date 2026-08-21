@@ -128,33 +128,17 @@ function reset_state() {
 $sync = DDI_Product_Sync::instance();
 
 // ---------------------------------------------------------------------------
-// force_manage_stock
+// manage_stock read filter must stay removed
 // ---------------------------------------------------------------------------
 
-echo "force_manage_stock:\n";
+echo "manage_stock read filter:\n";
 
-reset_state();
-mark_synced(10);
-$simple = new WC_Product(array('id' => 10, 'type' => 'simple'));
-check('forces manage_stock on for a synced simple product in admin',
-    $sync->force_manage_stock(false, $simple), true);
-
-$bundle = new WC_Product(array('id' => 10, 'type' => 'bundle'));
-check('does NOT force manage_stock for a synced bundle',
-    $sync->force_manage_stock(false, $bundle), false);
-
-$woosb = new WC_Product(array('id' => 10, 'type' => 'woosb'));
-check('does NOT force manage_stock for a woosb bundle',
-    $sync->force_manage_stock(false, $woosb), false);
-
-$GLOBALS['ddi_test_is_admin'] = false;
-check('does NOT rewrite manage_stock on the storefront',
-    $sync->force_manage_stock(false, $simple), false);
-$GLOBALS['ddi_test_is_admin'] = true;
-
-$unsynced = new WC_Product(array('id' => 11, 'type' => 'simple'));
-check('leaves unsynced products alone',
-    $sync->force_manage_stock(false, $unsynced), false);
+// Rewriting manage_stock in reads made wp-admin display "manage stock" as on
+// for products the inventory system deliberately set to unmanaged ("always
+// available"). Reads must report the stored value; protection lives in
+// enforce_synced_fields() at save time.
+check('force_manage_stock read-filter is removed',
+    method_exists($sync, 'force_manage_stock'), false);
 
 // ---------------------------------------------------------------------------
 // enforce_synced_fields — the wp-admin override vectors seen in production
